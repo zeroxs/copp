@@ -92,25 +92,120 @@ Server::~Server()
 
 bool Server::Init()
 {
+    logger->information("\e[34mLoading config\e[0m");
 
-    logger->fatal("init");
+    using Poco::JSON::Parser;
+    using Poco::Dynamic::Var;
+    using Poco::JSON::Object;
+    using Poco::JSON::Array;
+
+    Parser parser;
+    std::ifstream config("config.json");
+    parser.parse(config);
+    Var parsedResult = parser.result();
+
+    Object::Ptr configOptions = parsedResult.extract<Object::Ptr>();
+    if (configOptions)
+    {
+        try
+        {
+            auto a = configOptions->get("bindaddress");
+            if (a.isEmpty()) { logger->fatal("\e[91mbindaddress does not exist in config\e[0m"); return false; }
+            bindaddress = a.convert<string>();
+
+            a = configOptions->get("bindport");
+            if (a.isEmpty()) { logger->fatal("\e[91mbindport does not exist in config\e[0m"); return false; }
+            bindport = a.convert<string>();
+
+            a = configOptions->get("sqlhost");
+            if (a.isEmpty()) { logger->fatal("\e[91msqlhost does not exist in config\e[0m"); return false; }
+            sqlhost = a.convert<string>();
+
+            a = configOptions->get("sqluser");
+            if (a.isEmpty()) { logger->fatal("\e[91msqluser does not exist in config\e[0m"); return false; }
+            sqluser = a.convert<string>();
+
+            a = configOptions->get("sqlpass");
+            if (a.isEmpty()) { logger->fatal("\e[91msqlpass does not exist in config\e[0m"); return false; }
+            sqlpass = a.convert<string>();
+
+            a = configOptions->get("sqldb");
+            if (a.isEmpty()) { logger->fatal("\e[91msqldb does not exist in config\e[0m"); return false; }
+            sqldb = a.convert<string>();
+
+            a = configOptions->get("servername");
+            if (a.isEmpty()) { logger->fatal("\e[91mservername does not exist in config\e[0m"); return false; }
+            servername = a.convert<string>();
+        }
+        catch (...)
+        {
+            logger->fatal("\e[91mError in config.json\e[0m");
+            return false;
+        }
+    }
 
 
-//     try
-//     {
-//         pool = new Poco::Data::SessionPool("MySQL", "host=" + sqlhost + ";port=3306;db=" + sqldb + ";user=" + sqluser + ";password=" + sqlpass + ";compress=true;auto-reconnect=true");
-//     }
-//     catch (Poco::Exception& exc)
-//     {
-//         logger->fatal(Poco::format("Error connecting to MySQL: %s", exc.displayText()));
-//         return false;
-//     }
-     return true;
+    logger->information("\e[34mSetting up MySQL\e[0m");
+
+
+    try
+    {
+        pool = new Poco::Data::SessionPool("MySQL", "host=" + sqlhost + ";port=3306;db=" + sqldb + ";user=" + sqluser + ";password=" + sqlpass + ";compress=true;auto-reconnect=true");
+    }
+    catch (Poco::Exception& exc)
+    {
+        logger->fatal(Poco::format("\e[91mError connecting to MySQL: %s\e[0m", exc.displayText()));
+        return false;
+    }
+
+
+
+    logger->information("\e[34mSetting up Sockets\e[0m");
+
+    boost::asio::ip::tcp::resolver resolver(io_service_);
+    boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve({ bindaddress, bindport });
+    acceptor_.open(endpoint.protocol());
+    acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+
+    try
+    {
+        acceptor_.bind(endpoint);
+    }
+    catch (std::exception& e)
+    {
+        logger->fatal(Poco::format("\e[91mError listening on socket: %s\e[0m", e.what()));
+        return false;
+    }
+
+    acceptor_.listen();
+    do_accept();
+
+    return true;
 }
 
 void Server::do_accept()
 {
+    acceptor_.async_accept(socket_, 
+        [this](boost::system::error_code ec)
+        {
+            try
+            {
+                if (!acceptor_.is_open())
+                    return;
 
+                if (!ec)
+                    start(std::make_shared<connection>(std::move(socket_), request_handler_));
+            }
+            catch (std::exception& e)
+            {
+                logger->warning(Poco::format("\e[91mError accepting socket: %s\e[0m", e.what()));
+            }
+            catch (...)
+            {
+                logger->warning("\e[91mError listening on socket\e[0m");
+            }
+            do_accept();
+        });
 }
 
 void Server::Shutdown()
@@ -157,7 +252,8 @@ void Server::start(connection_ptr c)
         clients.push_back(b);
         b->_socket = c;
         c->client_ = b.get();
-        logger->information(Poco::format("Client connected %s", c->address));
+        //logger->information(Poco::format("Client connected %s", c->address));
+        logger->information("Client connected");
         connections_.insert(c);
         c->start();
     }

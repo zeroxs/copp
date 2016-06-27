@@ -10,6 +10,7 @@
       <Exec>false</Exec>
       <Fork>false</Fork>
       <Vfork>false</Vfork>
+      <Syscalls />
     </CatchpointConfiguration>
   </DebugPreferences>
 </VisualGDBUserPreferences>

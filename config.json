@@ -1,1 +1,9 @@
-#pragma once
+{
+	"sqlhost": "127.0.0.1",
+	"sqluser": "root",
+	"sqlpass": "",
+	"sqldb": "co",
+	"bindaddress": "0.0.0.0",
+	"bindport": "9958",
+	"servername": "test"
+}

@@ -29,6 +29,7 @@
 #include "includes.h"
 #include "connection.h"
 #include "Client.h"
+#include "request_handler.h"
 //#include <redisclient/redisasyncclient.h>
 //#include "network_messages.h"
 
@@ -70,6 +71,8 @@ public:
     boost::asio::ip::tcp::acceptor acceptor_;
     std::set<connection_ptr> connections_;
     connection_ptr new_connection_;
+
+    request_handler request_handler_;
 
     server_status serverstatus;
 

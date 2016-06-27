@@ -30,6 +30,7 @@
         <string>Makefile</string>
         <string>*.txt</string>
         <string>*.cmake</string>
+        <string>*.json</string>
       </FileMasks>
       <TransferNewFilesOnly>true</TransferNewFilesOnly>
       <IncludeSubdirectories>true</IncludeSubdirectories>
